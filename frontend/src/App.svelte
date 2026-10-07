@@ -8,15 +8,33 @@
   } from 'maplibre-gl'
   import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
   import 'maplibre-gl/dist/maplibre-gl.css'
+  import PagedTable from './lib/PagedTable.svelte'
 
   // See Vite installation at https://maplibre.org/maplibre-gl-js/docs
   setWorkerUrl(maplibreWorkerUrl)
+
+  const PAGE_SIZE = 10
+  const MAX_WKT_SIZE = 10000
+
+  const nodeColumns = [
+    { key: 'name', label: 'Name' },
+    {
+      key: 'records',
+      label: 'Records',
+      format: (value) => (value == null ? '' : Number(value).toLocaleString()),
+    },
+  ]
 
   let mapEl
   let map
   let geojson = $state(null)
   let selected = $state('')
   let mapReady = $state(false)
+
+  let nodesSkip = $state(0)
+  let nodesTotal = $state(0)
+  let nodeRows = $state([])
+  let nodesLoading = $state(false)
 
   const names = $derived(
     geojson?.features?.map((f) => f.properties.name).sort() ?? [],
@@ -26,7 +44,7 @@
     geojson?.features?.find((f) => f.properties.name === selected) ?? null,
   )
 
-  const mapPadding = { top: 40, bottom: 40, left: 280, right: 40 }
+  const mapPadding = { top: 40, bottom: 40, left: 300, right: 40 }
 
   function extendBounds(bounds, coords) {
     if (typeof coords[0] === 'number') bounds.extend(coords)
@@ -70,7 +88,7 @@
     const wkt = geometryToWkt(geometry)
     const size = encodeURIComponent(wkt).length
     console.log('WKT size:', size)
-    if (size <= 10000) return wkt
+    if (size <= MAX_WKT_SIZE) return wkt
     // If the WKT is too large, fall back to bounding box
     const bounds = new LngLatBounds()
     extendBounds(bounds, geometry.coordinates)
@@ -80,6 +98,10 @@
     const n = bounds.getNorth()
     return `POLYGON ((${w} ${s}, ${e} ${s}, ${e} ${n}, ${w} ${n}, ${w} ${s}))`
   }
+
+  const selectedWkt = $derived(
+    selectedFeature ? obisWkt(selectedFeature.geometry) : null,
+  )
 
   function applyPaint() {
     if (!map?.getLayer('mpas-fill')) return
@@ -161,6 +183,13 @@
     fitAll()
   }
 
+  // Reset node pagination when the selected MPA changes
+  $effect(() => {
+    selected
+    nodesSkip = 0
+  })
+
+  // Update map highlight, OBIS tiles, viewport
   $effect(() => {
     selected
     applyPaint()
@@ -172,8 +201,48 @@
     }
   })
 
+  // Add MPA layers
   $effect(() => {
     if (mapReady && geojson && !map.getSource('mpas')) addMpaLayers()
+  })
+
+  // Load contributing nodes
+  $effect(() => {
+    const wkt = selectedWkt
+    const skip = nodesSkip
+    if (!wkt) {
+      nodeRows = []
+      nodesTotal = 0
+      nodesLoading = false
+      return
+    }
+
+    const controller = new AbortController()
+    nodesLoading = true
+    const params = new URLSearchParams({
+      geometry: wkt,
+      skip: String(skip),
+      size: String(PAGE_SIZE),
+    })
+    fetch(`/api/nodes?${params}`, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`nodes ${r.status}`)
+        return r.json()
+      })
+      .then((data) => {
+        nodeRows = data.results ?? []
+        nodesTotal = data.total ?? 0
+        nodesLoading = false
+      })
+      .catch((err) => {
+        if (err.name === 'AbortError') return
+        console.error(err)
+        nodeRows = []
+        nodesTotal = 0
+        nodesLoading = false
+      })
+
+    return () => controller.abort()
   })
 
   onMount(() => {
@@ -218,6 +287,18 @@
     {#if selectedFeature}
       <p>Designation: {selectedFeature.properties.designation}</p>
       <p>WDPA ID: {selectedFeature.properties.wdpa_id}</p>
+
+      <div class="tables">
+        <PagedTable
+          title="Contributing nodes"
+          columns={nodeColumns}
+          rows={nodeRows}
+          total={nodesTotal}
+          bind:skip={nodesSkip}
+          size={PAGE_SIZE}
+          loading={nodesLoading}
+        />
+      </div>
     {/if}
   </aside>
 </div>
@@ -250,10 +331,19 @@
     z-index: 2;
     top: 1rem;
     left: 1rem;
-    width: min(20rem, calc(100% - 2rem));
+    width: min(22rem, calc(100% - 2rem));
+    max-height: calc(100% - 2rem);
     padding: 1rem;
     background: #fff;
     border-radius: 8px;
+    overflow-y: auto;
+  }
+
+  .tables {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1rem;
   }
 
   h1 {
