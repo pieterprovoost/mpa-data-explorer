@@ -26,20 +26,59 @@
     geojson?.features?.find((f) => f.properties.name === selected) ?? null,
   )
 
+  const mapPadding = { top: 40, bottom: 40, left: 280, right: 40 }
+
+  function extendBounds(bounds, coords) {
+    if (typeof coords[0] === 'number') bounds.extend(coords)
+    else for (const c of coords) extendBounds(bounds, c)
+  }
+
+  function fitGeometry(geometry, { maxZoom = 6, duration = 0 } = {}) {
+    const bounds = new LngLatBounds()
+    extendBounds(bounds, geometry.coordinates)
+    if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, { padding: mapPadding, maxZoom, duration })
+    }
+  }
+
   function fitAll() {
     const bounds = new LngLatBounds()
-    const walk = (coords) => {
-      if (typeof coords[0] === 'number') bounds.extend(coords)
-      else for (const c of coords) walk(c)
-    }
-    for (const f of geojson.features) walk(f.geometry.coordinates)
+    for (const f of geojson.features) extendBounds(bounds, f.geometry.coordinates)
     if (!bounds.isEmpty()) {
-      map.fitBounds(bounds, {
-        padding: { top: 40, bottom: 40, left: 280, right: 40 },
-        maxZoom: 6,
-        duration: 0,
-      })
+      map.fitBounds(bounds, { padding: mapPadding, maxZoom: 6, duration: 0 })
     }
+  }
+
+  function ringWkt(ring) {
+    return ring.map(([x, y]) => `${x} ${y}`).join(', ')
+  }
+
+  function geometryToWkt(geometry) {
+    if (geometry.type === 'Polygon') {
+      return `POLYGON (${geometry.coordinates.map((r) => `(${ringWkt(r)})`).join(', ')})`
+    }
+    if (geometry.type === 'MultiPolygon') {
+      const polys = geometry.coordinates.map(
+        (poly) => `(${poly.map((r) => `(${ringWkt(r)})`).join(', ')})`,
+      )
+      return `MULTIPOLYGON (${polys.join(', ')})`
+    }
+    throw new Error(`Unsupported geometry type: ${geometry.type}`)
+  }
+
+  function obisWkt(geometry) {
+    const wkt = geometryToWkt(geometry)
+    const size = encodeURIComponent(wkt).length
+    console.log('WKT size:', size)
+    if (size <= 10000) return wkt
+    // If the WKT is too large, fall back to bounding box
+    const bounds = new LngLatBounds()
+    extendBounds(bounds, geometry.coordinates)
+    const w = bounds.getWest()
+    const s = bounds.getSouth()
+    const e = bounds.getEast()
+    const n = bounds.getNorth()
+    return `POLYGON ((${w} ${s}, ${e} ${s}, ${e} ${n}, ${w} ${n}, ${w} ${s}))`
   }
 
   function applyPaint() {
@@ -49,6 +88,48 @@
     map.setPaintProperty('mpas-fill', 'fill-opacity', 0.25)
     map.setPaintProperty('mpas-line', 'line-color', ['case', match, '#c45c26', '#0f7c86'])
     map.setPaintProperty('mpas-line', 'line-width', ['case', match, 2.5, 1.5])
+  }
+
+  function clearObisLayers() {
+    if (map.getLayer('obis-points')) map.removeLayer('obis-points')
+    if (map.getSource('obis')) map.removeSource('obis')
+  }
+
+  function syncObisLayers() {
+    if (!mapReady || !map?.getSource('mpas')) return
+    clearObisLayers()
+    if (!selectedFeature) return
+
+    const wkt = obisWkt(selectedFeature.geometry)
+    const params = new URLSearchParams({
+      geometry: wkt,
+      tiletype: 'point',
+      cellspertile: '200',
+    })
+    map.addSource('obis', {
+      type: 'vector',
+      tiles: [
+        `https://api.obis.org/occurrence/tile/{x}/{y}/{z}.mvt?${params}`,
+      ],
+      minzoom: 0,
+      maxzoom: 14,
+    })
+    map.addLayer(
+      {
+        id: 'obis-points',
+        type: 'circle',
+        source: 'obis',
+        'source-layer': 'grid',
+        paint: {
+          'circle-opacity': 0,
+          'circle-stroke-color': '#000',
+          'circle-stroke-opacity': 0.85,
+          'circle-stroke-width': 1,
+          'circle-radius': 3,
+        },
+      },
+      'mpas-line',
+    )
   }
 
   function addMpaLayers() {
@@ -76,12 +157,19 @@
       map.getCanvas().style.cursor = ''
     })
     applyPaint()
+    syncObisLayers()
     fitAll()
   }
 
   $effect(() => {
     selected
     applyPaint()
+    syncObisLayers()
+    if (selectedFeature) {
+      fitGeometry(selectedFeature.geometry, { maxZoom: 10, duration: 400 })
+    } else if (mapReady && geojson && map?.getSource('mpas')) {
+      fitAll()
+    }
   })
 
   $effect(() => {
