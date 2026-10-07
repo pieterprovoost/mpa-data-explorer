@@ -7,10 +7,12 @@ Requires geopandas.
 from pathlib import Path
 import geopandas as gpd
 from shapely import set_precision
+from shapely.geometry import Polygon, MultiPolygon
 
 
-SIMPLIFY_DEGREES = 0.001
+SIMPLIFY_DEGREES = 0.002
 COORD_PRECISION = 0.00001
+MIN_HOLE_AREA = 1e-5
 
 root_path = Path(__file__).resolve().parents[1]
 shapefile_path = root_path / "data/raw/WDPA_WDOECM_Oct2026_Public_SA_shp/WDPA_WDOECM_Oct2026_Public_SA_shp_0/WDPA_WDOECM_Oct2026_Public_SA_shp-polygons.shp"
@@ -23,6 +25,24 @@ mpa_names = {
     "Malpelo",
     "Old Providence Mc Bean Lagoon",
 }
+
+
+def drop_small_holes(geom):
+    def one(poly: Polygon) -> Polygon:
+        keep = [ring for ring in poly.interiors if Polygon(ring).area >= MIN_HOLE_AREA]
+        return Polygon(poly.exterior, keep)
+
+    if geom.geom_type == "Polygon":
+        return one(geom)
+    if geom.geom_type == "MultiPolygon":
+        return MultiPolygon([one(p) for p in geom.geoms])
+    return geom
+
+
+def prepare_geometry(geom):
+    geom = drop_small_holes(geom)
+    geom = geom.simplify(SIMPLIFY_DEGREES, preserve_topology=True)
+    return set_precision(geom, grid_size=COORD_PRECISION)
 
 
 def main():
@@ -42,11 +62,7 @@ def main():
     gdf["designation"] = gdf["DESIG_ENG"]
     gdf["wdpa_id"] = gdf["SITE_ID"]
     gdf = gdf.to_crs(4326)
-    gdf["geometry"] = (
-        gdf.geometry.simplify(SIMPLIFY_DEGREES, preserve_topology=True).map(
-            lambda g: set_precision(g, grid_size=COORD_PRECISION)
-        )
-    )
+    gdf["geometry"] = gdf.geometry.map(prepare_geometry)
 
     out = gdf[["name", "designation", "wdpa_id", "geometry"]].sort_values("name")
     output_path.parent.mkdir(parents=True, exist_ok=True)
