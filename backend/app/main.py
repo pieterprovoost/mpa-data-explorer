@@ -1,9 +1,11 @@
 import asyncio
+import csv
+import io
 from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 
@@ -146,6 +148,53 @@ async def taxonomy(
         "total": len(results),
         "results": results[skip : skip + size],
     }
+
+
+@app.get("/api/occurrences.csv")
+async def occurrences_csv(
+    geometry: str = Query(..., min_length=1),
+) -> Response:
+    """All OBIS occurrences for a geometry as CSV."""
+    page_size = 10000
+    results = []
+    after = None
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        while True:
+            params = {"geometry": geometry, "size": page_size}
+            if after is not None:
+                params["after"] = after
+
+            resp = await client.get(f"{OBIS_API}/occurrence", params=params)
+            page = resp.json().get("results") or []
+            if not page:
+                break
+
+            for row in page:
+                results.append(
+                    {
+                        key: value
+                        for key, value in row.items()
+                        if not isinstance(value, (dict, list))
+                    }
+                )
+
+            # Use the last id for pagination
+            after = page[-1].get("id")
+            if after is None or len(page) < page_size:
+                break
+
+    fieldnames = sorted({key for row in results for key in row})
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(results)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=\"occurrences.csv\""},
+    )
 
 
 if static_path.is_dir():

@@ -423,6 +423,11 @@
         title="Records over time"
         rows={yearRows}
         loading={yearsLoading}
+        downloadHref={
+          selectedWkt
+            ? `/api/occurrences.csv?${new URLSearchParams({ geometry: selectedWkt })}`
+            : null
+        }
       />
       <PagedTable
         title="Taxonomy"

@@ -6,6 +6,7 @@
     title = 'Records over time',
     rows = [],
     loading = false,
+    downloadHref = null,
   } = $props()
 
   let chartEl = $state(null)
@@ -84,6 +85,19 @@
   {:else}
     <div class="chart" bind:this={chartEl}></div>
   {/if}
+
+  {#if downloadHref}
+    <button
+      type="button"
+      class="download"
+      onclick={() => {
+        window.location.href = downloadHref
+      }}
+    >
+      Download as CSV
+    </button>
+    <p>* Downloads can take up to a few minutes, keep this window open.</p>
+  {/if}
 </section>
 
 <style>
@@ -118,5 +132,13 @@
     display: block;
     max-width: 100%;
     height: auto;
+  }
+
+  .download {
+    margin-top: 0.65rem;
+    font: inherit;
+    font-size: 0.8rem;
+    padding: 0.25rem 0.55rem;
+    cursor: pointer;
   }
 </style>
