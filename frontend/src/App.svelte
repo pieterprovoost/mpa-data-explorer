@@ -9,6 +9,7 @@
   import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
   import 'maplibre-gl/dist/maplibre-gl.css'
   import PagedTable from './lib/PagedTable.svelte'
+  import YearsChart from './lib/YearsChart.svelte'
 
   // See Vite installation at https://maplibre.org/maplibre-gl-js/docs
   setWorkerUrl(maplibreWorkerUrl)
@@ -37,8 +38,10 @@
   let institutesTotal = $state(0)
   let nodeRows = $state([])
   let instituteRows = $state([])
+  let yearRows = $state([])
   let nodesLoading = $state(false)
   let institutesLoading = $state(false)
+  let yearsLoading = $state(false)
 
   const names = $derived(
     geojson?.features?.map((f) => f.properties.name).sort() ?? [],
@@ -289,6 +292,37 @@
     return () => controller.abort()
   })
 
+  // Load records per year
+  $effect(() => {
+    const wkt = selectedWkt
+    if (!wkt) {
+      yearRows = []
+      yearsLoading = false
+      return
+    }
+
+    const controller = new AbortController()
+    yearsLoading = true
+    const params = new URLSearchParams({ geometry: wkt })
+    fetch(`/api/years?${params}`, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`years ${r.status}`)
+        return r.json()
+      })
+      .then((data) => {
+        yearRows = data.results ?? []
+        yearsLoading = false
+      })
+      .catch((err) => {
+        if (err.name === 'AbortError') return
+        console.error(err)
+        yearRows = []
+        yearsLoading = false
+      })
+
+    return () => controller.abort()
+  })
+
   onMount(() => {
     map = new Map({
       container: mapEl,
@@ -333,6 +367,11 @@
       <p>WDPA ID: {selectedFeature.properties.wdpa_id}</p>
 
       <div class="tables">
+        <YearsChart
+          title="Records over time"
+          rows={yearRows}
+          loading={yearsLoading}
+        />
         <PagedTable
           title="Contributing nodes"
           columns={tableColumns}

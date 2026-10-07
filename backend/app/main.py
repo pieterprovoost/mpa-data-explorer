@@ -100,6 +100,25 @@ async def institutes(
     }
 
 
+@app.get("/api/years")
+async def years(
+    geometry: str = Query(..., min_length=1),
+) -> dict:
+    """Presence records per year for a geometry."""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.get(
+            f"{OBIS_API}/statistics/years",
+            params={"geometry": geometry},
+        )
+
+    results = [
+        {"year": item["year"], "records": item.get("records", 0)}
+        for item in resp.json()
+        if item.get("year") is not None
+    ]
+    return {"total": len(results), "results": results}
+
+
 if static_path.is_dir():
     assets = static_path / "assets"
     if assets.is_dir():
