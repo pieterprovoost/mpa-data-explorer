@@ -16,7 +16,7 @@
   const PAGE_SIZE = 10
   const MAX_WKT_SIZE = 10000
 
-  const nodeColumns = [
+  const tableColumns = [
     { key: 'name', label: 'Name' },
     {
       key: 'records',
@@ -32,9 +32,13 @@
   let mapReady = $state(false)
 
   let nodesSkip = $state(0)
+  let institutesSkip = $state(0)
   let nodesTotal = $state(0)
+  let institutesTotal = $state(0)
   let nodeRows = $state([])
+  let instituteRows = $state([])
   let nodesLoading = $state(false)
+  let institutesLoading = $state(false)
 
   const names = $derived(
     geojson?.features?.map((f) => f.properties.name).sort() ?? [],
@@ -183,10 +187,11 @@
     fitAll()
   }
 
-  // Reset node pagination when the selected MPA changes
+  // Reset table pagination when the selected MPA changes
   $effect(() => {
     selected
     nodesSkip = 0
+    institutesSkip = 0
   })
 
   // Update map highlight, OBIS tiles, viewport
@@ -245,6 +250,45 @@
     return () => controller.abort()
   })
 
+  // Load contributing institutes
+  $effect(() => {
+    const wkt = selectedWkt
+    const skip = institutesSkip
+    if (!wkt) {
+      instituteRows = []
+      institutesTotal = 0
+      institutesLoading = false
+      return
+    }
+
+    const controller = new AbortController()
+    institutesLoading = true
+    const params = new URLSearchParams({
+      geometry: wkt,
+      skip: String(skip),
+      size: String(PAGE_SIZE),
+    })
+    fetch(`/api/institutes?${params}`, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`institutes ${r.status}`)
+        return r.json()
+      })
+      .then((data) => {
+        instituteRows = data.results ?? []
+        institutesTotal = data.total ?? 0
+        institutesLoading = false
+      })
+      .catch((err) => {
+        if (err.name === 'AbortError') return
+        console.error(err)
+        instituteRows = []
+        institutesTotal = 0
+        institutesLoading = false
+      })
+
+    return () => controller.abort()
+  })
+
   onMount(() => {
     map = new Map({
       container: mapEl,
@@ -291,12 +335,21 @@
       <div class="tables">
         <PagedTable
           title="Contributing nodes"
-          columns={nodeColumns}
+          columns={tableColumns}
           rows={nodeRows}
           total={nodesTotal}
           bind:skip={nodesSkip}
           size={PAGE_SIZE}
           loading={nodesLoading}
+        />
+        <PagedTable
+          title="Contributing institutions"
+          columns={tableColumns}
+          rows={instituteRows}
+          total={institutesTotal}
+          bind:skip={institutesSkip}
+          size={PAGE_SIZE}
+          loading={institutesLoading}
         />
       </div>
     {/if}

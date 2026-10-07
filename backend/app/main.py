@@ -73,6 +73,33 @@ async def nodes(
     }
 
 
+@app.get("/api/institutes")
+async def institutes(
+    geometry: str = Query(..., min_length=1),
+    skip: int = Query(0, ge=0),
+    size: int = Query(10, ge=1, le=100),
+) -> dict:
+    """Contributing institutes for a geometry with occurrence counts."""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.get(
+            f"{OBIS_API}/institute",
+            params={"geometry": geometry, "skip": skip, "size": size},
+        )
+
+    data = resp.json()
+    return {
+        "total": data.get("total", 0),
+        "results": [
+            {
+                "id": item.get("id"),
+                "name": item.get("name"),
+                "records": item.get("records", 0),
+            }
+            for item in data.get("results", [])
+        ],
+    }
+
+
 if static_path.is_dir():
     assets = static_path / "assets"
     if assets.is_dir():
