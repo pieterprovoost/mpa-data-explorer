@@ -399,56 +399,58 @@
   <div class="map" bind:this={mapEl}></div>
 
   <aside class="panel">
-    <h1>MPA Data Explorer</h1>
+    <section class="card">
+      <h1>MPA Data Explorer</h1>
 
-    <label>
-      Protected area
-      <select bind:value={selected}>
-        <option value="">All areas</option>
-        {#each names as name}
-          <option value={name}>{name}</option>
-        {/each}
-      </select>
-    </label>
+      <label>
+        Protected area
+        <select bind:value={selected}>
+          <option value="">All areas</option>
+          {#each names as name}
+            <option value={name}>{name}</option>
+          {/each}
+        </select>
+      </label>
+
+      {#if selectedFeature}
+        <p>Designation: {selectedFeature.properties.designation}</p>
+        <p>WDPA ID: {selectedFeature.properties.wdpa_id}</p>
+      {/if}
+    </section>
 
     {#if selectedFeature}
-      <p>Designation: {selectedFeature.properties.designation}</p>
-      <p>WDPA ID: {selectedFeature.properties.wdpa_id}</p>
-
-      <div class="tables">
-        <YearsChart
-          title="Records over time"
-          rows={yearRows}
-          loading={yearsLoading}
-        />
-        <PagedTable
-          title="Taxonomy"
-          columns={taxonomyColumns}
-          rows={taxonomyRows}
-          total={taxonomyTotal}
-          bind:skip={taxonomySkip}
-          size={PAGE_SIZE}
-          loading={taxonomyLoading}
-        />
-        <PagedTable
-          title="Contributing nodes"
-          columns={tableColumns}
-          rows={nodeRows}
-          total={nodesTotal}
-          bind:skip={nodesSkip}
-          size={PAGE_SIZE}
-          loading={nodesLoading}
-        />
-        <PagedTable
-          title="Contributing institutions"
-          columns={tableColumns}
-          rows={instituteRows}
-          total={institutesTotal}
-          bind:skip={institutesSkip}
-          size={PAGE_SIZE}
-          loading={institutesLoading}
-        />
-      </div>
+      <YearsChart
+        title="Records over time"
+        rows={yearRows}
+        loading={yearsLoading}
+      />
+      <PagedTable
+        title="Taxonomy"
+        columns={taxonomyColumns}
+        rows={taxonomyRows}
+        total={taxonomyTotal}
+        bind:skip={taxonomySkip}
+        size={PAGE_SIZE}
+        loading={taxonomyLoading}
+      />
+      <PagedTable
+        title="Contributing nodes"
+        columns={tableColumns}
+        rows={nodeRows}
+        total={nodesTotal}
+        bind:skip={nodesSkip}
+        size={PAGE_SIZE}
+        loading={nodesLoading}
+      />
+      <PagedTable
+        title="Contributing institutions"
+        columns={tableColumns}
+        rows={instituteRows}
+        total={institutesTotal}
+        bind:skip={institutesSkip}
+        size={PAGE_SIZE}
+        loading={institutesLoading}
+      />
     {/if}
   </aside>
 </div>
@@ -481,19 +483,20 @@
     z-index: 2;
     top: 1rem;
     left: 1rem;
-    width: min(22rem, calc(100% - 2rem));
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    width: min(25rem, calc(100% - 2rem));
     max-height: calc(100% - 2rem);
+    padding-right: 0.85rem;
+    overflow-y: auto;
+    background: transparent;
+  }
+
+  .card {
     padding: 1rem;
     background: #fff;
     border-radius: 8px;
-    overflow-y: auto;
-  }
-
-  .tables {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    margin-top: 1rem;
   }
 
   h1 {

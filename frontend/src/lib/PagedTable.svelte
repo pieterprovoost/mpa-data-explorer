@@ -72,6 +72,9 @@
 <style>
   .table-block {
     min-width: 0;
+    padding: 1rem;
+    background: #fff;
+    border-radius: 8px;
   }
 
   header {
