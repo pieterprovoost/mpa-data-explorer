@@ -17,14 +17,19 @@
   const PAGE_SIZE = 10
   const MAX_WKT_SIZE = 10000
 
+  const formatCount = (value) =>
+    value == null ? '' : Number(value).toLocaleString()
+
   const tableColumns = [
     { key: 'name', label: 'Name' },
-    {
-      key: 'records',
-      label: 'Records',
-      format: (value) => (value == null ? '' : Number(value).toLocaleString()),
-    },
+    { key: 'records', label: 'Records', format: formatCount },
   ]
+
+  const taxonomyColumns = [
+    { key: 'name', label: 'Phylum' },
+    { key: 'records', label: 'Records', format: formatCount },
+  ]
+
 
   let mapEl
   let map
@@ -34,14 +39,18 @@
 
   let nodesSkip = $state(0)
   let institutesSkip = $state(0)
+  let taxonomySkip = $state(0)
   let nodesTotal = $state(0)
   let institutesTotal = $state(0)
+  let taxonomyTotal = $state(0)
   let nodeRows = $state([])
   let instituteRows = $state([])
   let yearRows = $state([])
+  let taxonomyRows = $state([])
   let nodesLoading = $state(false)
   let institutesLoading = $state(false)
   let yearsLoading = $state(false)
+  let taxonomyLoading = $state(false)
 
   const names = $derived(
     geojson?.features?.map((f) => f.properties.name).sort() ?? [],
@@ -195,6 +204,7 @@
     selected
     nodesSkip = 0
     institutesSkip = 0
+    taxonomySkip = 0
   })
 
   // Update map highlight, OBIS tiles, viewport
@@ -323,6 +333,45 @@
     return () => controller.abort()
   })
 
+  // Load taxonomic groups
+  $effect(() => {
+    const wkt = selectedWkt
+    const skip = taxonomySkip
+    if (!wkt) {
+      taxonomyRows = []
+      taxonomyTotal = 0
+      taxonomyLoading = false
+      return
+    }
+
+    const controller = new AbortController()
+    taxonomyLoading = true
+    const params = new URLSearchParams({
+      geometry: wkt,
+      skip: String(skip),
+      size: String(PAGE_SIZE),
+    })
+    fetch(`/api/taxonomy?${params}`, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`taxonomy ${r.status}`)
+        return r.json()
+      })
+      .then((data) => {
+        taxonomyRows = data.results ?? []
+        taxonomyTotal = data.total ?? 0
+        taxonomyLoading = false
+      })
+      .catch((err) => {
+        if (err.name === 'AbortError') return
+        console.error(err)
+        taxonomyRows = []
+        taxonomyTotal = 0
+        taxonomyLoading = false
+      })
+
+    return () => controller.abort()
+  })
+
   onMount(() => {
     map = new Map({
       container: mapEl,
@@ -371,6 +420,15 @@
           title="Records over time"
           rows={yearRows}
           loading={yearsLoading}
+        />
+        <PagedTable
+          title="Taxonomy"
+          columns={taxonomyColumns}
+          rows={taxonomyRows}
+          total={taxonomyTotal}
+          bind:skip={taxonomySkip}
+          size={PAGE_SIZE}
+          loading={taxonomyLoading}
         />
         <PagedTable
           title="Contributing nodes"

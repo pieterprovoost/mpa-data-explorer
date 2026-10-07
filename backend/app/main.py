@@ -119,6 +119,35 @@ async def years(
     return {"total": len(results), "results": results}
 
 
+@app.get("/api/taxonomy")
+async def taxonomy(
+    geometry: str = Query(..., min_length=1),
+    skip: int = Query(0, ge=0),
+    size: int = Query(10, ge=1, le=100),
+) -> dict:
+    """Top-level taxonomic groups for a geometry with occurrence counts."""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.get(
+            f"{OBIS_API}/statistics/taxonomy",
+            params={"geometry": geometry},
+        )
+
+    children = resp.json().get("children") or []
+    results = [
+        {
+            "name": item.get("name"),
+            "records": item.get("value", 0),
+        }
+        for item in children
+        if item.get("name")
+    ]
+    results.sort(key=lambda row: row["records"], reverse=True)
+    return {
+        "total": len(results),
+        "results": results[skip : skip + size],
+    }
+
+
 if static_path.is_dir():
     assets = static_path / "assets"
     if assets.is_dir():
