@@ -413,8 +413,9 @@
       </label>
 
       {#if selectedFeature}
-        <p>Designation: {selectedFeature.properties.designation}</p>
-        <p>WDPA ID: {selectedFeature.properties.wdpa_id}</p>
+        <p>Category: {selectedFeature.properties.category}</p>
+        <p>Inscription date: {selectedFeature.properties.inscription_date}</p>
+        <p>RUNAP ID: {selectedFeature.properties.runap_id}</p>
       {/if}
     </section>
 
