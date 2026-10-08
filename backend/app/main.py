@@ -1,6 +1,7 @@
 import asyncio
 import csv
 import io
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -205,7 +206,18 @@ async def occurrences_csv(
                 break
 
     fieldnames = sorted({key for row in results for key in row})
+    year = datetime.now(timezone.utc).year
     buf = io.StringIO()
+    buf.write(
+        "# For individual datasets retrieved from OBIS, dataset citations "
+        "are available from the dataset landing page.\n"
+        "# In addition to citing the individual datasets and taking into "
+        "account the restrictions set at each dataset level, also cite the "
+        "OBIS database as follows:\n"
+        f"# OBIS ({year}) Ocean Biodiversity Information System. "
+        "Intergovernmental Oceanographic Commission of UNESCO. "
+        "https://obis.org\n"
+    )
     writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
     writer.writeheader()
     writer.writerows(results)
