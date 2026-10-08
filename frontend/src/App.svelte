@@ -4,6 +4,7 @@
     Map,
     NavigationControl,
     LngLatBounds,
+    Popup,
     setWorkerUrl,
   } from 'maplibre-gl'
   import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
@@ -20,6 +21,18 @@
   const formatCount = (value) =>
     value == null ? '' : Number(value).toLocaleString()
 
+  const formatDate = (value) => {
+    if (!value) return '—'
+    const date = new Date(`${value}T00:00:00Z`)
+    if (Number.isNaN(date.getTime())) return String(value)
+    return date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC',
+    })
+  }
+
   const tableColumns = [
     { key: 'name', label: 'Name' },
     { key: 'records', label: 'Records', format: formatCount },
@@ -33,6 +46,7 @@
 
   let mapEl
   let map
+  let hoverPopup
   let geojson = $state(null)
   let selected = $state('')
   let mapReady = $state(false)
@@ -120,12 +134,13 @@
   )
 
   function applyPaint() {
-    if (!map?.getLayer('mpas-fill')) return
+    if (!map?.getLayer('mpas-fill') || !map?.getLayer('mpas-line')) return
     const match = ['==', ['get', 'name'], selected || '']
-    map.setPaintProperty('mpas-fill', 'fill-color', ['case', match, '#c45c26', '#0f7c86'])
+    map.setPaintProperty('mpas-fill', 'fill-color', '#0f7c86')
     map.setPaintProperty('mpas-fill', 'fill-opacity', 0.25)
-    map.setPaintProperty('mpas-line', 'line-color', ['case', match, '#c45c26', '#0f7c86'])
-    map.setPaintProperty('mpas-line', 'line-width', ['case', match, 2.5, 1.5])
+    map.setPaintProperty('mpas-line', 'line-color', '#0f7c86')
+    map.setPaintProperty('mpas-line', 'line-width', 2)
+    map.setPaintProperty('mpas-line', 'line-opacity', ['case', match, 1, 0])
   }
 
   function clearObisLayers() {
@@ -170,6 +185,30 @@
     )
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+  }
+
+  function hoverPopupHtml(properties) {
+    const rows = [
+      ['Category', properties.category],
+      ['Inscribed', formatDate(properties.inscription_date)],
+      ['RUNAP ID', properties.runap_id],
+    ]
+    const body = rows
+      .filter(([, v]) => v != null && v !== '')
+      .map(
+        ([label, value]) =>
+          `<div class="mpa-popup-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`,
+      )
+      .join('')
+    return `<div class="mpa-popup-card"><div class="mpa-popup-title">${escapeHtml(properties.name)}</div>${body}</div>`
+  }
+
   function addMpaLayers() {
     map.addSource('mpas', { type: 'geojson', data: geojson })
     map.addLayer({
@@ -182,17 +221,41 @@
       id: 'mpas-line',
       type: 'line',
       source: 'mpas',
-      paint: { 'line-color': '#0f7c86', 'line-width': 1.5 },
+      paint: {
+        'line-color': '#0f7c86',
+        'line-width': 2,
+        'line-opacity': 0,
+      },
+    })
+    hoverPopup = new Popup({
+      closeButton: false,
+      closeOnClick: false,
+      offset: 14,
+      maxWidth: '18rem',
+      className: 'mpa-popup',
     })
     map.on('click', 'mpas-fill', (e) => {
       const name = e.features?.[0]?.properties?.name
-      if (name) selected = name === selected ? '' : name
+      if (!name) return
+      selected = name === selected ? '' : name
+      if (selected === name) hoverPopup?.remove()
     })
-    map.on('mouseenter', 'mpas-fill', () => {
+    map.on('mousemove', 'mpas-fill', (e) => {
       map.getCanvas().style.cursor = 'pointer'
+      const feature = e.features?.[0]
+      if (!feature) return
+      if (feature.properties?.name === selected) {
+        hoverPopup?.remove()
+        return
+      }
+      hoverPopup
+        .setLngLat(e.lngLat)
+        .setHTML(hoverPopupHtml(feature.properties))
+        .addTo(map)
     })
     map.on('mouseleave', 'mpas-fill', () => {
       map.getCanvas().style.cursor = ''
+      hoverPopup?.remove()
     })
     applyPaint()
     syncObisLayers()
@@ -375,7 +438,7 @@
   onMount(() => {
     map = new Map({
       container: mapEl,
-      style: 'https://tiles.openfreemap.org/styles/positron',
+      style: 'https://tiles.openfreemap.org/styles/bright',
       center: [-74, 4.5],
       zoom: 4.5,
     })
@@ -391,7 +454,10 @@
       })
       .catch(console.error)
 
-    return () => map?.remove()
+    return () => {
+      hoverPopup?.remove()
+      map?.remove()
+    }
   })
 </script>
 
@@ -400,12 +466,13 @@
 
   <aside class="panel">
     <section class="card">
+      <p class="eyebrow">Colombia - RUNAP</p>
       <h1>MPA Data Explorer</h1>
 
       <label>
-        Protected area
+        <span class="field-label">Protected area</span>
         <select bind:value={selected}>
-          <option value="">All areas</option>
+          <option value="">(Select a protected area)</option>
           {#each names as name}
             <option value={name}>{name}</option>
           {/each}
@@ -413,9 +480,31 @@
       </label>
 
       {#if selectedFeature}
-        <p>Category: {selectedFeature.properties.category}</p>
-        <p>Inscription date: {selectedFeature.properties.inscription_date}</p>
-        <p>RUNAP ID: {selectedFeature.properties.runap_id}</p>
+        <dl class="attrs">
+          <div>
+            <dt>Category</dt>
+            <dd>{selectedFeature.properties.category || '—'}</dd>
+          </div>
+          <div>
+            <dt>Inscribed</dt>
+            <dd>{formatDate(selectedFeature.properties.inscription_date)}</dd>
+          </div>
+          <div>
+            <dt>RUNAP ID</dt>
+            <dd>{selectedFeature.properties.runap_id ?? '—'}</dd>
+          </div>
+        </dl>
+        {#if selectedWkt}
+          <div class="download">
+            <a
+              class="btn btn-primary"
+              href={`/api/occurrences.csv?${new URLSearchParams({ geometry: selectedWkt })}`}
+            >
+              Download all records as CSV
+            </a>
+            <p class="note">Downloads can take a few minutes - do not navigate away.</p>
+          </div>
+        {/if}
       {/if}
     </section>
 
@@ -424,11 +513,6 @@
         title="Records over time"
         rows={yearRows}
         loading={yearsLoading}
-        downloadHref={
-          selectedWkt
-            ? `/api/occurrences.csv?${new URLSearchParams({ geometry: selectedWkt })}`
-            : null
-        }
       />
       <PagedTable
         title="Taxonomy"
@@ -462,12 +546,26 @@
 </div>
 
 <style>
+  :global(:root) {
+    --ink: #14212b;
+    --muted: #5b6b78;
+    --line: #e6ebef;
+    --soft: #f4f7f8;
+    --card: #ffffff;
+    --accent: #0f7c86;
+    --shadow: 0 1px 2px rgb(20 33 43 / 0.04), 0 10px 28px rgb(20 33 43 / 0.08);
+    --font-sans: 'DM Sans', system-ui, sans-serif;
+    --font-display: 'Fraunces', Georgia, serif;
+  }
+
   :global(html),
   :global(body),
   :global(#app) {
     margin: 0;
     height: 100%;
-    font-family: system-ui, sans-serif;
+    font-family: var(--font-sans);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
   }
 
   :global(*) {
@@ -491,8 +589,8 @@
     left: 1rem;
     display: flex;
     flex-direction: column;
-    gap: 0.65rem;
-    width: min(25rem, calc(100% - 2rem));
+    gap: 0.7rem;
+    width: min(25.5rem, calc(100% - 2rem));
     max-height: calc(100% - 2rem);
     padding-right: 0.85rem;
     overflow-y: auto;
@@ -500,28 +598,188 @@
   }
 
   .card {
-    padding: 1rem;
-    background: #fff;
-    border-radius: 8px;
+    padding: 1.1rem 1.15rem;
+    background: var(--card);
+    border: 1px solid rgb(255 255 255 / 0.7);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+  }
+
+  .eyebrow {
+    margin: 0 0 0.25rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
   }
 
   h1 {
-    margin: 0 0 0.75rem;
-    font-size: 1.15rem;
+    margin: 0 0 0.95rem;
+    font-family: var(--font-display);
+    font-size: 1.45rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
   }
 
   label {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.4rem;
+  }
+
+  .field-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
   }
 
   select {
+    appearance: none;
+    width: 100%;
     font: inherit;
-    padding: 0.4rem;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: var(--ink);
+    padding: 0.65rem 2.2rem 0.65rem 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background:
+      linear-gradient(45deg, transparent 50%, var(--muted) 50%) calc(100% - 1.05rem) calc(50% - 0.15rem) / 0.35rem 0.35rem
+        no-repeat,
+      linear-gradient(135deg, var(--muted) 50%, transparent 50%) calc(100% - 0.75rem) calc(50% - 0.15rem) / 0.35rem
+        0.35rem no-repeat,
+      var(--soft);
+    cursor: pointer;
   }
 
-  p {
-    margin: 0.6rem 0 0;
+  select:focus {
+    outline: 2px solid rgb(15 124 134 / 0.28);
+    outline-offset: 1px;
+    border-color: var(--accent);
+    background-color: #fff;
+  }
+
+  .attrs {
+    display: grid;
+    gap: 0.7rem;
+    margin: 1rem 0 0;
+    padding-top: 0.95rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .attrs > div {
+    display: grid;
+    gap: 0.18rem;
+  }
+
+  .attrs dt {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .attrs dd {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--ink);
+  }
+
+  .download {
+    display: grid;
+    gap: 0.4rem;
+    margin-top: 1rem;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    min-height: 2.1rem;
+    padding: 0.45rem 0.9rem;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 120ms ease;
+  }
+
+  .btn-primary {
+    color: #fff;
+    background: var(--ink);
+  }
+
+  .btn-primary:hover {
+    background: #243542;
+  }
+
+  .note {
+    margin: 0;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    color: var(--muted);
+  }
+
+  :global(.mpa-popup .maplibregl-popup-content) {
+    padding: 0;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  :global(.mpa-popup .maplibregl-popup-tip) {
+    border-top-color: #fff;
+  }
+
+  :global(.mpa-popup-card) {
+    padding: 0.8rem 0.9rem;
+    background: #fff;
+    color: var(--ink);
+    font: 13px/1.35 var(--font-sans);
+  }
+
+  :global(.mpa-popup-title) {
+    margin-bottom: 0.55rem;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.98rem;
+    letter-spacing: -0.01em;
+  }
+
+  :global(.mpa-popup-row) {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.85rem;
+    margin-top: 0.28rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+
+  :global(.mpa-popup-row span) {
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    font-weight: 600;
+    font-size: 0.66rem;
+  }
+
+  :global(.mpa-popup-row strong) {
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-align: right;
+    text-transform: none;
+    letter-spacing: 0;
   }
 </style>

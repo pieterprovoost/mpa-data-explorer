@@ -6,7 +6,6 @@
     title = 'Records over time',
     rows = [],
     loading = false,
-    downloadHref = null,
   } = $props()
 
   let chartEl = $state(null)
@@ -29,30 +28,40 @@
 
     const plot = Plot.plot({
       width: el.clientWidth || 280,
-      height: 140,
-      marginTop: 8,
-      marginRight: 8,
+      height: 148,
+      marginTop: 10,
+      marginRight: 10,
       marginBottom: 28,
-      marginLeft: 40,
+      marginLeft: 42,
       x: {
         label: null,
         domain: [startYear, endYear],
         ticks: 4,
         tickFormat: (d) => String(Math.round(d)),
       },
-      y: { label: null, grid: true, nice: true },
+      y: {
+        label: null,
+        grid: true,
+        nice: true,
+        tickFormat: (d) =>
+          d >= 1000 ? `${Math.round(d / 1000)}k` : String(d),
+      },
       marks: [
-        Plot.rectY(series, {
+        Plot.ruleY([0], { stroke: '#e6ebef' }),
+        Plot.ruleX(series, {
           x: 'year',
-          interval: 1,
-          y: 'records',
-          fill: '#0f7c86',
+          y1: 0,
+          y2: 'records',
+          stroke: '#14212b',
+          strokeWidth: 1.5,
+          strokeLinecap: 'round',
           title: (d) => `${d.year}: ${d.records.toLocaleString()} records`,
         }),
       ],
       style: {
         fontSize: '10px',
-        color: '#555',
+        fontFamily: 'DM Sans, system-ui, sans-serif',
+        color: '#5b6b78',
         background: 'transparent',
       },
     })
@@ -79,49 +88,41 @@
   </header>
 
   {#if loading}
-    <p class="status">Loading...</p>
+    <p class="status">Loading…</p>
   {:else if rows.length === 0}
     <p class="status">No results</p>
   {:else}
     <div class="chart" bind:this={chartEl}></div>
-  {/if}
-
-  {#if downloadHref}
-    <button
-      type="button"
-      class="download"
-      onclick={() => {
-        window.location.href = downloadHref
-      }}
-    >
-      Download as CSV
-    </button>
-    <p>* Downloads can take up to a few minutes, keep this window open.</p>
   {/if}
 </section>
 
 <style>
   .chart-block {
     min-width: 0;
-    padding: 1rem;
+    padding: 1.1rem 1.15rem;
     background: #fff;
-    border-radius: 8px;
+    border: 1px solid rgb(255 255 255 / 0.7);
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgb(20 33 43 / 0.04), 0 10px 28px rgb(20 33 43 / 0.08);
   }
 
   header {
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.55rem;
   }
 
   h2 {
     margin: 0;
-    font-size: 0.95rem;
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 1.05rem;
     font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #14212b;
   }
 
   .status {
     margin: 0;
-    font-size: 0.8rem;
-    color: #555;
+    font-size: 0.82rem;
+    color: #5b6b78;
   }
 
   .chart {
@@ -132,13 +133,5 @@
     display: block;
     max-width: 100%;
     height: auto;
-  }
-
-  .download {
-    margin-top: 0.65rem;
-    font: inherit;
-    font-size: 0.8rem;
-    padding: 0.25rem 0.55rem;
-    cursor: pointer;
   }
 </style>
