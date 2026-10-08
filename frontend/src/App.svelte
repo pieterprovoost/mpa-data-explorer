@@ -60,10 +60,12 @@
   let nodeRows = $state([])
   let instituteRows = $state([])
   let yearRows = $state([])
+  let totalRecords = $state(null)
   let taxonomyRows = $state([])
   let nodesLoading = $state(false)
   let institutesLoading = $state(false)
   let yearsLoading = $state(false)
+  let statsLoading = $state(false)
   let taxonomyLoading = $state(false)
 
   const names = $derived(
@@ -396,6 +398,37 @@
     return () => controller.abort()
   })
 
+  // Load aggregate statistics (total records)
+  $effect(() => {
+    const wkt = selectedWkt
+    if (!wkt) {
+      totalRecords = null
+      statsLoading = false
+      return
+    }
+
+    const controller = new AbortController()
+    statsLoading = true
+    const params = new URLSearchParams({ geometry: wkt })
+    fetch(`/api/statistics?${params}`, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`statistics ${r.status}`)
+        return r.json()
+      })
+      .then((data) => {
+        totalRecords = data.records ?? 0
+        statsLoading = false
+      })
+      .catch((err) => {
+        if (err.name === 'AbortError') return
+        console.error(err)
+        totalRecords = null
+        statsLoading = false
+      })
+
+    return () => controller.abort()
+  })
+
   // Load taxonomic groups
   $effect(() => {
     const wkt = selectedWkt
@@ -513,6 +546,8 @@
         title="Records over time"
         rows={yearRows}
         loading={yearsLoading}
+        totalRecords={totalRecords}
+        statsLoading={statsLoading}
       />
       <PagedTable
         title="Taxonomy"

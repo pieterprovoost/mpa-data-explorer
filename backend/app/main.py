@@ -102,6 +102,26 @@ async def institutes(
     }
 
 
+@app.get("/api/statistics")
+async def statistics(
+    geometry: str = Query(..., min_length=1),
+) -> dict:
+    """Aggregate OBIS statistics for a geometry."""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.get(
+            f"{OBIS_API}/statistics",
+            params={"geometry": geometry},
+        )
+
+    data = resp.json()
+    return {
+        "records": data.get("records", 0),
+        "species": data.get("species", 0),
+        "taxa": data.get("taxa", 0),
+        "datasets": data.get("datasets", 0),
+    }
+
+
 @app.get("/api/years")
 async def years(
     geometry: str = Query(..., min_length=1),

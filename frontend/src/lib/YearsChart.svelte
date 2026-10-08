@@ -6,6 +6,8 @@
     title = 'Records over time',
     rows = [],
     loading = false,
+    totalRecords = null,
+    statsLoading = false,
   } = $props()
 
   let chartEl = $state(null)
@@ -85,10 +87,13 @@
 <section class="chart-block">
   <header>
     <h2>{title}</h2>
+    {#if !statsLoading && totalRecords != null}
+      <p class="total"><strong>{Number(totalRecords).toLocaleString()}</strong> records across all years</p>
+    {/if}
   </header>
 
   {#if loading}
-    <p class="status">Loading…</p>
+    <p class="status">Loading graph...</p>
   {:else if rows.length === 0}
     <p class="status">No results</p>
   {:else}
@@ -117,6 +122,17 @@
     font-weight: 600;
     letter-spacing: -0.01em;
     color: #14212b;
+  }
+
+  .total {
+    margin: 0.3rem 0 0;
+    font-size: 0.86rem;
+    color: #5b6b78;
+  }
+
+  .total strong {
+    color: #14212b;
+    font-weight: 700;
   }
 
   .status {
