@@ -585,6 +585,29 @@
         size={PAGE_SIZE}
         loading={institutesLoading}
       />
+      <section class="card sources">
+        <h2>Data sources</h2>
+        <ul>
+          <li>
+            Protected area boundaries:
+            <a href="https://runap.parquesnacionales.gov.co/" target="_blank" rel="noopener noreferrer"
+              >Parques Nacionales Naturales de Colombia — RUNAP</a
+            >
+            (CC BY-SA 4.0).
+          </li>
+          <li>
+            Biodiversity data:
+            <a href="https://obis.org" target="_blank" rel="noopener noreferrer"
+              >OBIS (Ocean Biodiversity Information System)</a
+            >, IOC-UNESCO.
+          </li>
+          <li>
+            Basemap:
+            <a href="https://openfreemap.org/" target="_blank" rel="noopener noreferrer">OpenFreeMap</a>
+            Bright style, based on OpenStreetMap data.
+          </li>
+        </ul>
+      </section>
     {/if}
   </aside>
 </div>
@@ -774,6 +797,42 @@
     font-size: 0.72rem;
     line-height: 1.4;
     color: var(--muted);
+  }
+
+  .sources h2 {
+    margin: 0 0 0.55rem;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+
+  .sources ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .sources li {
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+
+  .sources a {
+    color: var(--ink);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: rgb(20 33 43 / 0.25);
+    text-underline-offset: 0.15em;
+  }
+
+  .sources a:hover {
+    color: var(--accent);
+    text-decoration-color: rgb(15 124 134 / 0.45);
   }
 
   :global(.mpa-popup .maplibregl-popup-content) {
