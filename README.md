@@ -3,7 +3,7 @@
 ## Data sources
 
 - Protected area boundaries: Parques Nacionales Naturales de Colombia - RUNAP (Registro Único Nacional de Áreas Protegidas). Licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Source: https://runap.parquesnacionales.gov.co/.
-- Biodiversityb data: OBIS (2006) Ocean Biodiversity Information System. Intergovernmental Oceanographic Commission of UNESCO. https://obis.org.
+- Biodiversity data: OBIS (2006) Ocean Biodiversity Information System. Intergovernmental Oceanographic Commission of UNESCO. https://obis.org.
 - Basemap: [OpenFreeMap](https://openfreemap.org/) Bright style (`https://tiles.openfreemap.org/styles/bright`), based on OpenStreetMap data.
 
 ## How to build and run the container
@@ -37,9 +37,11 @@ Then open the application at http://localhost:8000.
 
 ## What would I do with two more days
 
+- More explicitly address the gaps in space, time, and taxonomy.
 - Add more interesting data visualizations, such as an overall taxonomy treemap or a gap analysis for major taxonomic groups over time.
 - Add a more complete dataset of MPAs, make the selection of MPAs configurable so the application can be easily reused by member states.
-- Add a dataset listing.
+- Add a dataset listing and occurrence record browsing.
+- Add short TTL caching of OBIS API responses for repeated queries on the same MPA.
 
 ## Containerisation
 
