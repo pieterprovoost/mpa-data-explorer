@@ -17,6 +17,8 @@
 
   const PAGE_SIZE = 10
   const MAX_WKT_SIZE = 10000
+  // Hardcoded accepted Phylum / Phylum (Division) count from WoRMS.
+  const WORMS_PHYLA_TOTAL = 106
 
   const formatCount = (value) =>
     value == null ? '' : Number(value).toLocaleString()
@@ -557,6 +559,13 @@
         bind:skip={taxonomySkip}
         size={PAGE_SIZE}
         loading={taxonomyLoading}
+        summary={!taxonomyLoading && taxonomyTotal > 0
+          ? {
+              observed: taxonomyTotal,
+              expected: WORMS_PHYLA_TOTAL,
+              label: 'phyla in WoRMS',
+            }
+          : null}
       />
       <PagedTable
         title="Contributing nodes"

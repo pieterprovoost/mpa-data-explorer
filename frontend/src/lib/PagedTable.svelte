@@ -7,6 +7,7 @@
     skip = $bindable(0),
     size = 10,
     loading = false,
+    summary = null,
   } = $props()
 
   const from = $derived(total === 0 ? 0 : skip + 1)
@@ -30,7 +31,16 @@
 
 <section class="table-block">
   <header>
-    <h2>{title}</h2>
+    <div class="heading">
+      <h2>{title}</h2>
+      {#if !loading && summary}
+        <p class="summary">
+          <strong class="observed">{summary.observed}</strong> of
+          <strong class="expected">{summary.expected}</strong>
+          {summary.label}
+        </p>
+      {/if}
+    </div>
     {#if !loading && total > 0}
       <span class="meta">{from}–{to} of {total}</span>
     {/if}
@@ -91,6 +101,10 @@
     margin-bottom: 0.55rem;
   }
 
+  .heading {
+    min-width: 0;
+  }
+
   h2 {
     margin: 0;
     font-family: 'Fraunces', Georgia, serif;
@@ -100,11 +114,28 @@
     color: #14212b;
   }
 
+  .summary {
+    margin: 0.3rem 0 0;
+    font-size: 0.86rem;
+    color: #5b6b78;
+  }
+
+  .summary .observed {
+    color: #c45c4a;
+    font-weight: 700;
+  }
+
+  .summary .expected {
+    color: #14212b;
+    font-weight: 700;
+  }
+
   .meta,
   .status {
     margin: 0;
     font-size: 0.78rem;
     color: #5b6b78;
+    flex-shrink: 0;
   }
 
   .scroll {
