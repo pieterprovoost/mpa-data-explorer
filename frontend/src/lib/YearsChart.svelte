@@ -27,6 +27,14 @@
     const startYear = 1950
     const endYear = new Date().getFullYear()
     const series = data.filter((d) => d.year >= startYear && d.year <= endYear)
+    const yearsWithData = new Set(
+      series.filter((d) => d.records > 0).map((d) => d.year),
+    )
+    const gaps = []
+    for (let year = startYear; year <= endYear; year++) {
+      if (!yearsWithData.has(year)) gaps.push(year)
+    }
+    const yMax = Math.max(...series.map((d) => d.records), 1)
 
     const plot = Plot.plot({
       width: el.clientWidth || 280,
@@ -49,6 +57,15 @@
           d >= 1000 ? `${Math.round(d / 1000)}k` : String(d),
       },
       marks: [
+        Plot.rectY(gaps, {
+          x1: (d) => d - 0.45,
+          x2: (d) => d + 0.45,
+          y1: 0,
+          y2: yMax,
+          fill: '#c45c4a',
+          fillOpacity: 0.18,
+          title: (d) => `${d}: no data`,
+        }),
         Plot.ruleY([0], { stroke: '#e6ebef' }),
         Plot.ruleX(series, {
           x: 'year',
